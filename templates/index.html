@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multimodal Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+      <span class="logo-text">Multimodal Search</span>
+    </div>
+    <div class="header-right">
+      <div class="index-pill"><span class="count" id="img-count">—</span> images indexed</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-eyebrow">CLIP · Qdrant · BM25</div>
+    <h1 class="hero-title">Find anything with<br><em>text or image</em></h1>
+    <p class="hero-sub">Semantic search across your entire image collection using multimodal AI embeddings.</p>
+  </section>
+
+  <div class="search-wrap">
+    <div class="search-field" id="text-field">
+      <div class="search-icon">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+      <input
+        type="text"
+        class="search-input"
+        id="query-input"
+        placeholder="sunset over mountains, a red car, people laughing…"
+        autocomplete="off"
+        autofocus
+      >
+      <button class="search-btn" id="search-btn" onclick="runTextSearch()">Search</button>
+    </div>
+
+    <div class="mode-tabs">
+      <button class="tab active" id="tab-text" onclick="setMode('text')">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+        Text
+      </button>
+      <button class="tab" id="tab-hybrid" onclick="setMode('hybrid')">
+        <svg viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        Hybrid
+      </button>
+      <button class="tab" id="tab-image" onclick="setMode('image')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        Image
+      </button>
+    </div>
+
+    <div class="upload-zone hidden" id="upload-zone">
+      <input type="file" id="file-input" accept="image/*" onchange="onFileSelected(this)">
+      <label class="upload-label" for="file-input">
+        <div class="upload-icon-ring">
+          <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <p>Click to upload an image</p>
+        <span>JPG, PNG, WEBP up to 10MB</span>
+      </label>
+      <div class="upload-file-preview hidden" id="file-preview">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        <span id="file-name-text"></span>
+      </div>
+      <button class="img-search-btn hidden" id="img-btn" onclick="runImageSearch()">Search with this image</button>
+    </div>
+  </div>
+
+  <div class="status-bar" id="status">
+    <div class="spinner" id="status-spinner"></div>
+    <span id="status-text"></span>
+  </div>
+
+  <div id="results-section" class="hidden">
+    <div class="results-header">
+      <div class="results-count"><strong id="count-num">0</strong> results</div>
+      <div class="results-badges">
+        <div class="mode-badge" id="mode-badge"></div>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="empty-state" id="empty-state">
+    <div class="empty-rings">
+      <div class="empty-icon-inner">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </div>
+    </div>
+    <h3>Search your collection</h3>
+    <p>Type a description or upload an image to find visually similar results</p>
+    <div class="suggestion-chips">
+      <button class="chip" onclick="suggest('sunset over the ocean')">sunset over the ocean</button>
+      <button class="chip" onclick="suggest('a dog playing')">a dog playing</button>
+      <button class="chip" onclick="suggest('city at night')">city at night</button>
+      <button class="chip" onclick="suggest('mountain landscape')">mountain landscape</button>
+      <button class="chip" onclick="suggest('white flower')">white flower</button>
+    </div>
+  </div>
+</main>
+
+</body>
+</html>
