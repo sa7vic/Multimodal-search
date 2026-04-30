@@ -113,5 +113,184 @@
   </div>
 </main>
 
+<script>
+let mode = 'text';
+let selectedFile = null;
+let busy = false;
+
+async function loadStats() {
+  try {
+    const r = await fetch('/stats');
+    const d = await r.json();
+    document.getElementById('img-count').textContent = d.total_images.toLocaleString();
+  } catch {}
+}
+
+function setMode(m) {
+  mode = m;
+  ['text','hybrid','image'].forEach(id => {
+    document.getElementById('tab-' + id).classList.toggle('active', id === m);
+  });
+  const isImg = m === 'image';
+  document.getElementById('text-field').classList.toggle('hidden', isImg);
+  document.getElementById('upload-zone').classList.toggle('hidden', !isImg);
+  if (!isImg) document.getElementById('query-input').focus();
+}
+
+function onFileSelected(input) {
+  selectedFile = input.files[0];
+  if (!selectedFile) return;
+  document.getElementById('file-name-text').textContent = selectedFile.name;
+  document.getElementById('file-preview').classList.remove('hidden');
+  document.getElementById('img-btn').classList.remove('hidden');
+}
+
+function suggest(q) {
+  setMode('text');
+  document.getElementById('query-input').value = q;
+  runTextSearch();
+}
+
+function setLoading(on) {
+  busy = on;
+  document.getElementById('search-btn').disabled = on;
+  document.getElementById('search-btn').textContent = on ? 'Searching…' : 'Search';
+  document.getElementById('img-btn').disabled = on;
+  const bar = document.getElementById('status');
+  const spinner = document.getElementById('status-spinner');
+  const txt = document.getElementById('status-text');
+  if (on) {
+    txt.textContent = 'Searching…';
+    spinner.style.display = 'block';
+    bar.className = 'status-bar visible loading';
+  } else {
+    bar.className = 'status-bar';
+  }
+}
+
+function showError(msg) {
+  const bar = document.getElementById('status');
+  document.getElementById('status-spinner').style.display = 'none';
+  document.getElementById('status-text').textContent = msg;
+  bar.className = 'status-bar visible error';
+}
+
+async function runTextSearch() {
+  if (busy) return;
+  const query = document.getElementById('query-input').value.trim();
+  if (!query) return;
+  const endpoint = mode === 'hybrid' ? '/search/hybrid' : '/search/text';
+  setLoading(true);
+  try {
+    const r = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, top_k: 20 }),
+    });
+    const d = await r.json();
+    if (!r.ok) { showError(d.error || 'Search failed'); return; }
+    render(d.results, d.mode);
+  } catch(e) {
+    showError('Network error — is Flask running?');
+  } finally {
+    setLoading(false);
+  }
+}
+
+async function runImageSearch() {
+  if (!selectedFile || busy) return;
+  setLoading(true);
+  const form = new FormData();
+  form.append('file', selectedFile);
+  form.append('top_k', '20');
+  try {
+    const r = await fetch('/search/image', { method: 'POST', body: form });
+    const d = await r.json();
+    if (!r.ok) { showError(d.error || 'Search failed'); return; }
+    render(d.results, 'image');
+  } catch(e) {
+    showError('Network error — is Flask running?');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function render(results, modeName) {
+  document.getElementById('empty-state').classList.add('hidden');
+  const section = document.getElementById('results-section');
+  const grid = document.getElementById('grid');
+
+  if (!results || results.length === 0) {
+    showError('No results found — try a different query.');
+    section.classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('count-num').textContent = results.length;
+  const badge = document.getElementById('mode-badge');
+  badge.textContent = modeName;
+  badge.className = 'mode-badge ' + modeName;
+  section.classList.remove('hidden');
+
+  const isHybrid = results[0] && results[0].clip_score !== undefined;
+
+  grid.innerHTML = '';
+
+  results.forEach((r, i) => {
+    const pct      = (r.score * 100).toFixed(1);
+    const fillW    = Math.min(r.score * 200, 100).toFixed(1);
+    const caption  = (r.caption || r.filename || 'image ' + r.id)
+                       .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const detail   = isHybrid
+      ? 'CLIP ' + (r.clip_score * 100).toFixed(1) + '% · BM25 ' + (r.bm25_score * 100).toFixed(1) + '%'
+      : 'similarity';
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.animationDelay = Math.min(i * 0.04, 0.4) + 's';
+
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'card-img-wrap';
+
+    const img = document.createElement('img');
+    img.className = 'card-img';
+    img.alt = caption;
+    img.loading = 'lazy';
+    img.src = '/image/' + r.id;
+    img.onerror = function() {
+      imgWrap.innerHTML = '<div class="card-img-err"><svg viewBox="0 0 24 24" stroke-width="1.5" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span>not found</span></div>';
+    };
+
+    const overlay = document.createElement('div');
+    overlay.className = 'card-score-overlay';
+    overlay.textContent = pct + '%';
+
+    imgWrap.appendChild(img);
+    imgWrap.appendChild(overlay);
+
+    card.innerHTML += '';
+    card.appendChild(imgWrap);
+
+    const body = document.createElement('div');
+    body.className = 'card-body';
+    body.innerHTML =
+      '<div class="card-caption" title="' + caption + '">' + caption + '</div>' +
+      '<div class="score-track"><div class="score-fill" style="width:' + fillW + '%"></div></div>' +
+      '<div class="score-meta">' +
+        '<span class="score-clips">' + detail + '</span>' +
+        '<span class="score-rank">#' + (i + 1) + '</span>' +
+      '</div>';
+
+    card.appendChild(body);
+    grid.appendChild(card);
+  });
+}
+  
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && mode !== 'image') runTextSearch();
+});
+
+loadStats();
+</script>
 </body>
 </html>
